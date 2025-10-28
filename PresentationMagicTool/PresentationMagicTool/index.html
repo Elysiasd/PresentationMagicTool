@@ -42,6 +42,50 @@
                     <span id="current-style">当前风格: Word</span>
                 </div>
             </div>
+
+            <!-- 控制面板 -->
+            <div class="control-panel">
+                <div class="control-section">
+                    <div class="control-buttons">
+                        <button class="control-btn" id="play-btn" title="自动播放">
+                            <span class="btn-icon">▶️</span>
+                            <span class="btn-text">播放</span>
+                        </button>
+                        <button class="control-btn" id="pause-btn" title="暂停" disabled>
+                            <span class="btn-icon">⏸️</span>
+                            <span class="btn-text">暂停</span>
+                        </button>
+                        <button class="control-btn" id="reset-btn" title="重置">
+                            <span class="btn-icon">🔄</span>
+                            <span class="btn-text">重置</span>
+                        </button>
+                        <button class="control-btn" id="show-all-btn" title="显示全部">
+                            <span class="btn-icon">📄</span>
+                            <span class="btn-text">全部</span>
+                        </button>
+                    </div>
+                    <div class="speed-control">
+                        <label for="speed-slider">速度：</label>
+                        <input type="range" id="speed-slider" min="1" max="200" value="50" />
+                        <span id="speed-value">50</span>
+                    </div>
+                </div>
+                <div class="progress-section">
+                    <div class="progress-bar-container">
+                        <div class="progress-bar" id="progress-bar"></div>
+                    </div>
+                    <span class="progress-text" id="progress-text">0%</span>
+                </div>
+            </div>
+
+            <!-- 文件历史 -->
+            <div class="history-panel" id="history-panel">
+                <div class="history-header">
+                    <span>📚 最近文件</span>
+                    <button class="history-toggle" id="history-toggle">▼</button>
+                </div>
+                <div class="history-list" id="history-list"></div>
+            </div>
             
             <!-- Word风格界面 -->
             <div class="word-interface" id="word-interface">

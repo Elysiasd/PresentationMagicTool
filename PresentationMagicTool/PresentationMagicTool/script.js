@@ -8,6 +8,14 @@ let currentFileName = ''; // 当前文件名
 let lastHighlightedContent = ''; // 上次高亮的内容
 let highlightCache = new Map(); // 高亮缓存
 
+// 新功能变量
+let autoPlayInterval = null; // 自动播放定时器
+let isAutoPlaying = false; // 是否正在自动播放
+let typingSpeed = 50; // 打字速度（毫秒）
+let fileHistory = []; // 文件历史记录
+let isEditMode = false; // 是否处于编辑模式
+let editableElement = null; // 当前可编辑的元素
+
 // DOM 元素
 const wordInterface = document.getElementById('word-interface');
 const vscodeInterface = document.getElementById('vscode-interface');
@@ -23,6 +31,22 @@ const filePreview = document.getElementById('file-preview');
 const importBtn = document.getElementById('import-btn');
 const cancelBtn = document.getElementById('cancel-btn');
 const closeModal = document.getElementById('close-modal');
+
+// 控制面板元素
+const playBtn = document.getElementById('play-btn');
+const pauseBtn = document.getElementById('pause-btn');
+const resetBtn = document.getElementById('reset-btn');
+const showAllBtn = document.getElementById('show-all-btn');
+const speedSlider = document.getElementById('speed-slider');
+const speedValue = document.getElementById('speed-value');
+const progressBar = document.getElementById('progress-bar');
+const progressBarContainer = document.querySelector('.progress-bar-container');
+const progressText = document.getElementById('progress-text');
+
+// 历史面板元素
+const historyPanel = document.getElementById('history-panel');
+const historyToggle = document.getElementById('history-toggle');
+const historyList = document.getElementById('history-list');
 
 // 初始化
 document.addEventListener('DOMContentLoaded', function() {
@@ -55,9 +79,51 @@ function initializeApp() {
     // 初始化隐藏输入框
     hiddenTextarea.addEventListener('input', handleTextInput);
     
+    // 绑定控制面板事件
+    playBtn.addEventListener('click', startAutoPlay);
+    pauseBtn.addEventListener('click', pauseAutoPlay);
+    resetBtn.addEventListener('click', resetDisplay);
+    showAllBtn.addEventListener('click', showAllContent);
+    speedSlider.addEventListener('input', updateSpeed);
+    progressBarContainer.addEventListener('click', seekProgress);
+    
+    // 绑定历史面板事件
+    historyToggle.addEventListener('click', toggleHistory);
+    document.querySelector('.history-header').addEventListener('click', toggleHistory);
+    
+    // 绑定菜单按钮事件
+    bindMenuButtons();
+    
+    // 加载历史记录
+    loadHistory();
+    
     // 设置初始状态
     updateStatus();
     updateMenuActiveState();
+    updateControlButtons();
+}
+
+// 绑定菜单按钮事件
+function bindMenuButtons() {
+    // Word风格菜单
+    const wordMenuBtns = document.querySelectorAll('.word-toolbar .toolbar-btn');
+    wordMenuBtns.forEach((btn, index) => {
+        if (index === 0) { // 文件
+            btn.addEventListener('click', () => openReplaceFileDialog());
+        } else if (index === 1) { // 编辑
+            btn.addEventListener('click', () => toggleEditMode());
+        }
+    });
+    
+    // VSCode风格菜单
+    const vscodeMenuItems = document.querySelectorAll('.vscode-menu .menu-item');
+    vscodeMenuItems.forEach((item, index) => {
+        if (index === 0) { // 文件
+            item.addEventListener('click', () => openReplaceFileDialog());
+        } else if (index === 1) { // 编辑
+            item.addEventListener('click', () => toggleEditMode());
+        }
+    });
 }
 
 // 打开文件导入模态框
@@ -103,8 +169,12 @@ function importFile() {
             // 清理缓存
             clearHighlightCache();
             
+            // 保存到历史记录
+            saveToHistory(currentFileName, importedContent, currentFileType);
+            
             updateDisplay();
             updateStatus();
+            updateControlButtons();
             closeFileModal();
             showNotification(`文件导入成功！检测到语言: ${getLanguageName(currentFileType)}`, 'success');
         };
@@ -413,6 +483,11 @@ function updateLineNumbers(content) {
 
 // 处理键盘按下事件
 function handleKeyDown(event) {
+    // 如果处于编辑模式，不拦截键盘事件
+    if (isEditMode) {
+        return;
+    }
+    
     // 如果按的是特殊键（如Ctrl, Alt, Shift等），不处理
     if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) {
         return;
@@ -479,6 +554,262 @@ function updateStatus() {
     const styleName = currentStyle === 'word' ? 'Word' : 'VSCode';
     const languageName = currentFileName ? getLanguageName(currentFileType) : '';
     currentStyleSpan.textContent = `当前风格: ${styleName}${languageName ? ` | 语言: ${languageName}` : ''}`;
+    updateProgressBar();
+}
+
+// 更新进度条
+function updateProgressBar() {
+    if (importedContent.length === 0) {
+        progressBar.style.width = '0%';
+        progressText.textContent = '0%';
+        return;
+    }
+    
+    const progress = (currentDisplayIndex / importedContent.length) * 100;
+    progressBar.style.width = `${progress}%`;
+    progressText.textContent = `${Math.round(progress)}%`;
+}
+
+// 更新控制按钮状态
+function updateControlButtons() {
+    const hasContent = importedContent.length > 0;
+    const isComplete = currentDisplayIndex >= importedContent.length;
+    
+    playBtn.disabled = !hasContent || isComplete || isAutoPlaying;
+    pauseBtn.disabled = !isAutoPlaying;
+    resetBtn.disabled = !hasContent || (currentDisplayIndex === 0 && !isAutoPlaying);
+    showAllBtn.disabled = !hasContent || isComplete;
+    
+    if (isAutoPlaying) {
+        playBtn.classList.add('active');
+    } else {
+        playBtn.classList.remove('active');
+    }
+}
+
+// 开始自动播放
+function startAutoPlay() {
+    if (!importedContent || isAutoPlaying || currentDisplayIndex >= importedContent.length) {
+        return;
+    }
+    
+    isAutoPlaying = true;
+    updateControlButtons();
+    
+    autoPlayInterval = setInterval(() => {
+        if (currentDisplayIndex < importedContent.length) {
+            currentDisplayIndex++;
+            updateDisplay();
+            updateStatus();
+            updateControlButtons();
+        } else {
+            stopAutoPlay();
+            showNotification('演示完成！', 'success');
+        }
+    }, typingSpeed);
+}
+
+// 暂停自动播放
+function pauseAutoPlay() {
+    stopAutoPlay();
+    showNotification('已暂停', 'info');
+}
+
+// 停止自动播放
+function stopAutoPlay() {
+    if (autoPlayInterval) {
+        clearInterval(autoPlayInterval);
+        autoPlayInterval = null;
+    }
+    isAutoPlaying = false;
+    updateControlButtons();
+}
+
+// 重置显示
+function resetDisplay() {
+    stopAutoPlay();
+    currentDisplayIndex = 0;
+    clearHighlightCache();
+    updateDisplay();
+    updateStatus();
+    updateControlButtons();
+    showNotification('已重置', 'info');
+}
+
+// 显示全部内容
+function showAllContent() {
+    stopAutoPlay();
+    currentDisplayIndex = importedContent.length;
+    updateDisplay();
+    updateStatus();
+    updateControlButtons();
+    showNotification('已显示全部内容', 'success');
+}
+
+// 更新速度
+function updateSpeed() {
+    typingSpeed = 201 - parseInt(speedSlider.value);
+    speedValue.textContent = speedSlider.value;
+    
+    // 如果正在播放，重新启动以应用新速度
+    if (isAutoPlaying) {
+        stopAutoPlay();
+        startAutoPlay();
+    }
+}
+
+// 进度条跳转
+function seekProgress(event) {
+    if (!importedContent) return;
+    
+    const rect = progressBarContainer.getBoundingClientRect();
+    const clickX = event.clientX - rect.left;
+    const percentage = clickX / rect.width;
+    
+    stopAutoPlay();
+    currentDisplayIndex = Math.floor(importedContent.length * percentage);
+    clearHighlightCache();
+    updateDisplay();
+    updateStatus();
+    updateControlButtons();
+}
+
+// 切换历史面板
+function toggleHistory() {
+    historyPanel.classList.toggle('expanded');
+}
+
+// 保存到历史记录
+function saveToHistory(fileName, content, fileType) {
+    const historyItem = {
+        fileName: fileName,
+        content: content,
+        fileType: fileType,
+        timestamp: Date.now()
+    };
+    
+    // 移除重复的文件
+    fileHistory = fileHistory.filter(item => item.fileName !== fileName);
+    
+    // 添加到开头
+    fileHistory.unshift(historyItem);
+    
+    // 限制历史记录数量
+    if (fileHistory.length > 10) {
+        fileHistory = fileHistory.slice(0, 10);
+    }
+    
+    // 保存到 localStorage
+    try {
+        localStorage.setItem('fileHistory', JSON.stringify(fileHistory));
+    } catch (e) {
+        console.warn('无法保存历史记录:', e);
+    }
+    
+    updateHistoryDisplay();
+}
+
+// 加载历史记录
+function loadHistory() {
+    try {
+        const saved = localStorage.getItem('fileHistory');
+        if (saved) {
+            fileHistory = JSON.parse(saved);
+            updateHistoryDisplay();
+        }
+    } catch (e) {
+        console.warn('无法加载历史记录:', e);
+        fileHistory = [];
+    }
+}
+
+// 更新历史记录显示
+function updateHistoryDisplay() {
+    historyList.innerHTML = '';
+    
+    if (fileHistory.length === 0) {
+        historyList.innerHTML = '<div style="padding: 10px; text-align: center; color: #6c757d;">暂无历史记录</div>';
+        return;
+    }
+    
+    fileHistory.forEach((item, index) => {
+        const historyItemDiv = document.createElement('div');
+        historyItemDiv.className = 'history-item';
+        
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'history-item-name';
+        nameSpan.textContent = item.fileName;
+        
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'history-item-time';
+        timeSpan.textContent = formatTime(item.timestamp);
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'history-item-delete';
+        deleteBtn.textContent = '×';
+        deleteBtn.title = '删除';
+        deleteBtn.onclick = (e) => {
+            e.stopPropagation();
+            deleteHistoryItem(index);
+        };
+        
+        historyItemDiv.appendChild(nameSpan);
+        historyItemDiv.appendChild(timeSpan);
+        historyItemDiv.appendChild(deleteBtn);
+        
+        historyItemDiv.onclick = () => loadHistoryItem(item);
+        
+        historyList.appendChild(historyItemDiv);
+    });
+}
+
+// 加载历史记录项
+function loadHistoryItem(item) {
+    importedContent = item.content;
+    currentFileName = item.fileName;
+    currentFileType = item.fileType;
+    currentDisplayIndex = 0;
+    
+    stopAutoPlay();
+    clearHighlightCache();
+    updateDisplay();
+    updateStatus();
+    updateControlButtons();
+    
+    showNotification(`已加载: ${item.fileName}`, 'success');
+}
+
+// 删除历史记录项
+function deleteHistoryItem(index) {
+    fileHistory.splice(index, 1);
+    try {
+        localStorage.setItem('fileHistory', JSON.stringify(fileHistory));
+    } catch (e) {
+        console.warn('无法保存历史记录:', e);
+    }
+    updateHistoryDisplay();
+    showNotification('已删除', 'info');
+}
+
+// 格式化时间
+function formatTime(timestamp) {
+    const now = Date.now();
+    const diff = now - timestamp;
+    
+    const minute = 60 * 1000;
+    const hour = 60 * minute;
+    const day = 24 * hour;
+    
+    if (diff < minute) {
+        return '刚刚';
+    } else if (diff < hour) {
+        return `${Math.floor(diff / minute)}分钟前`;
+    } else if (diff < day) {
+        return `${Math.floor(diff / hour)}小时前`;
+    } else {
+        const date = new Date(timestamp);
+        return `${date.getMonth() + 1}/${date.getDate()}`;
+    }
 }
 
 // 更新菜单激活状态
@@ -703,8 +1034,12 @@ document.addEventListener('drop', function(e) {
                 // 清理缓存
                 clearHighlightCache();
                 
+                // 保存到历史记录
+                saveToHistory(currentFileName, importedContent, currentFileType);
+                
                 updateDisplay();
                 updateStatus();
+                updateControlButtons();
                 showNotification(`文件导入成功！检测到语言: ${getLanguageName(currentFileType)}`, 'success');
             };
             reader.readAsText(file, 'UTF-8');
@@ -752,3 +1087,232 @@ document.addEventListener('keydown', function(e) {
         showNotification('显示全部内容', 'info');
     }
 });
+
+// ==================== 文件替换功能 ====================
+
+// 打开文件替换对话框
+function openReplaceFileDialog() {
+    if (!importedContent) {
+        showNotification('请先导入一个文件', 'warning');
+        openFileModal();
+        return;
+    }
+    
+    // 创建文件输入元素
+    const replaceInput = document.createElement('input');
+    replaceInput.type = 'file';
+    replaceInput.accept = '.txt,.md,.js,.html,.css,.py,.java,.cpp,.c,.json,.xml,.csv';
+    
+    replaceInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                replaceFile(e.target.result, file.name);
+            };
+            reader.readAsText(file, 'UTF-8');
+        }
+    });
+    
+    replaceInput.click();
+}
+
+// 替换文件（保留当前显示字符数）
+function replaceFile(newContent, newFileName) {
+    // 保存当前显示的字符数量
+    const currentCharCount = currentDisplayIndex;
+    
+    // 停止自动播放
+    stopAutoPlay();
+    
+    // 更新内容
+    importedContent = newContent;
+    currentFileName = newFileName;
+    currentFileType = detectFileType(newFileName);
+    
+    // 保留相同的字符数量（如果新文件更短，则显示全部）
+    currentDisplayIndex = Math.min(currentCharCount, importedContent.length);
+    
+    // 清理缓存
+    clearHighlightCache();
+    
+    // 保存到历史记录
+    saveToHistory(currentFileName, importedContent, currentFileType);
+    
+    // 更新显示
+    updateDisplay();
+    updateStatus();
+    updateControlButtons();
+    
+    showNotification(`文件已替换！保留了前 ${currentDisplayIndex} 个字符`, 'success');
+}
+
+// ==================== 编辑模式功能 ====================
+
+// 切换编辑模式
+function toggleEditMode() {
+    if (!importedContent) {
+        showNotification('请先导入一个文件', 'warning');
+        return;
+    }
+    
+    if (isEditMode) {
+        exitEditMode();
+    } else {
+        enterEditMode();
+    }
+}
+
+// 进入编辑模式
+function enterEditMode() {
+    isEditMode = true;
+    
+    // 停止自动播放
+    stopAutoPlay();
+    
+    // 先显示全部内容
+    currentDisplayIndex = importedContent.length;
+    
+    if (currentStyle === 'word') {
+        enterWordEditMode();
+    } else {
+        enterVSCodeEditMode();
+    }
+    
+    showNotification('已进入编辑模式，可以直接修改文本', 'info');
+}
+
+// Word风格编辑模式
+function enterWordEditMode() {
+    // 使文档内容可编辑
+    documentContent.contentEditable = true;
+    documentContent.style.cursor = 'text';
+    documentContent.style.outline = '2px solid #4a90e2';
+    documentContent.style.outlineOffset = '2px';
+    
+    // 显示全部内容（转义后的HTML）
+    const paragraphs = importedContent.split('\n').filter(p => p.trim() !== '');
+    if (paragraphs.length === 0) {
+        documentContent.innerHTML = '<p><br></p>';
+    } else {
+        const html = paragraphs.map(p => `<p>${escapeHtml(p)}</p>`).join('');
+        documentContent.innerHTML = html;
+    }
+    
+    editableElement = documentContent;
+    documentContent.focus();
+    
+    // 绑定输入事件
+    documentContent.addEventListener('input', handleEditInput);
+}
+
+// VSCode风格编辑模式
+function enterVSCodeEditMode() {
+    // 使代码内容可编辑
+    codeContent.contentEditable = true;
+    codeContent.style.cursor = 'text';
+    codeContent.style.outline = '2px solid #007acc';
+    codeContent.style.outlineOffset = '2px';
+    
+    // 显示全部内容（纯文本）
+    codeContent.innerHTML = `<pre><code class="language-${currentFileType}">${escapeHtml(importedContent)}</code></pre>`;
+    
+    editableElement = codeContent;
+    codeContent.focus();
+    
+    // 绑定输入事件
+    codeContent.addEventListener('input', handleEditInput);
+}
+
+// 处理编辑输入
+function handleEditInput() {
+    if (!isEditMode) return;
+    
+    // 获取当前编辑的文本
+    let editedText;
+    if (currentStyle === 'word') {
+        // Word风格：从段落中提取文本
+        const paragraphs = Array.from(documentContent.querySelectorAll('p'));
+        editedText = paragraphs.map(p => p.textContent).join('\n');
+    } else {
+        // VSCode风格：从code元素中提取文本
+        const codeElement = codeContent.querySelector('code');
+        editedText = codeElement ? codeElement.textContent : codeContent.textContent;
+    }
+    
+    // 更新导入的内容
+    importedContent = editedText;
+    currentDisplayIndex = importedContent.length;
+    
+    // 更新状态
+    updateStatus();
+}
+
+// 退出编辑模式
+function exitEditMode() {
+    // 先同步编辑的内容
+    syncEditedContent();
+    
+    isEditMode = false;
+    
+    if (currentStyle === 'word') {
+        exitWordEditMode();
+    } else {
+        exitVSCodeEditMode();
+    }
+    
+    // 保存修改后的内容到历史记录
+    if (currentFileName) {
+        saveToHistory(currentFileName, importedContent, currentFileType);
+    }
+    
+    // 重新显示（应用语法高亮等）
+    clearHighlightCache();
+    updateDisplay();
+    updateStatus();
+    
+    showNotification('已退出编辑模式，内容已保存', 'success');
+}
+
+// 同步编辑的内容
+function syncEditedContent() {
+    if (!isEditMode) return;
+    
+    // 获取当前编辑的文本
+    let editedText;
+    if (currentStyle === 'word') {
+        // Word风格：从段落中提取文本
+        const paragraphs = Array.from(documentContent.querySelectorAll('p'));
+        editedText = paragraphs.map(p => p.textContent).join('\n');
+    } else {
+        // VSCode风格：从code元素中提取文本
+        const codeElement = codeContent.querySelector('code');
+        editedText = codeElement ? codeElement.textContent : codeContent.textContent;
+    }
+    
+    // 更新导入的内容
+    importedContent = editedText;
+    currentDisplayIndex = importedContent.length;
+}
+
+// 退出Word编辑模式
+function exitWordEditMode() {
+    documentContent.contentEditable = false;
+    documentContent.style.cursor = 'default';
+    documentContent.style.outline = 'none';
+    
+    // 移除输入事件监听
+    documentContent.removeEventListener('input', handleEditInput);
+    editableElement = null;
+}
+
+// 退出VSCode编辑模式
+function exitVSCodeEditMode() {
+    codeContent.contentEditable = false;
+    codeContent.style.cursor = 'default';
+    codeContent.style.outline = 'none';
+    
+    // 移除输入事件监听
+    codeContent.removeEventListener('input', handleEditInput);
+    editableElement = null;
+}
