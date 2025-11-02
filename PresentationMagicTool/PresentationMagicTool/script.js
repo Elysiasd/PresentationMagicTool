@@ -251,214 +251,37 @@ function updateVSCodeDisplay(content) {
     const cacheKey = `${currentFileType}-${content.length}`;
     if (highlightCache.has(cacheKey)) {
         const cachedResult = highlightCache.get(cacheKey);
-        codeContent.innerHTML = `<pre><code class="language-${currentFileType}">${cachedResult}</code></pre>`;
+        codeContent.innerHTML = cachedResult;
         updateLineNumbers(content);
         return;
     }
     
-    // 对于代码高亮，我们需要特殊处理
-    let highlightedCode;
+    // 创建 code 元素
+    const pre = document.createElement('pre');
+    const code = document.createElement('code');
+    code.className = `language-${currentFileType}`;
+    code.textContent = content;
+    pre.appendChild(code);
     
-    if (currentFileType === 'plaintext' || currentFileType === 'markdown') {
-        // 对于纯文本和Markdown，直接显示内容
-        highlightedCode = escapeHtml(content);
-    } else {
-        // 对于代码文件，使用优化的高亮策略
-        highlightedCode = getOptimizedHighlight(content);
+    // 使用 Prism 高亮
+    if (typeof Prism !== 'undefined' && Prism.languages[currentFileType]) {
+        try {
+            Prism.highlightElement(code);
+        } catch (error) {
+            console.warn('Prism 高亮失败，使用纯文本显示:', error);
+        }
     }
     
     // 缓存结果
-    highlightCache.set(cacheKey, highlightedCode);
+    const resultHTML = pre.outerHTML;
+    highlightCache.set(cacheKey, resultHTML);
     
     // 更新代码内容
-    codeContent.innerHTML = `<pre><code class="language-${currentFileType}">${highlightedCode}</code></pre>`;
+    codeContent.innerHTML = resultHTML;
     
     // 更新行号
     updateLineNumbers(content);
     lastHighlightedContent = content;
-}
-
-// 优化的高亮策略
-function getOptimizedHighlight(content) {
-    try {
-        // 策略1: 尝试完整内容高亮
-        if (content.length > 10) {
-            const completeContent = ensureCompleteSyntax(content);
-            return Prism.highlight(completeContent, Prism.languages[currentFileType] || Prism.languages.plaintext, currentFileType);
-        }
-        
-        // 策略2: 对于短内容，使用简单高亮
-        return getSimpleHighlight(content);
-        
-    } catch (error) {
-        // 策略3: 如果高亮失败，回退到转义显示
-        return escapeHtml(content);
-    }
-}
-
-// 简单高亮策略（用于短内容）
-function getSimpleHighlight(content) {
-    // 对于短内容，手动添加一些基本的高亮
-    let result = escapeHtml(content);
-    
-    // 添加关键字高亮
-    const keywords = getKeywordsForLanguage(currentFileType);
-    keywords.forEach(keyword => {
-        const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
-        result = result.replace(regex, `<span class="token keyword">${keyword}</span>`);
-    });
-    
-    // 添加字符串高亮
-    result = result.replace(/(["'`])([^"'`]*?)\1/g, '<span class="token string">$1$2$1</span>');
-    
-    // 添加注释高亮
-    result = result.replace(/(\/\/.*$)/gm, '<span class="token comment">$1</span>');
-    result = result.replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="token comment">$1</span>');
-    
-    return result;
-}
-
-// 获取不同语言的关键字
-function getKeywordsForLanguage(language) {
-    const keywordMap = {
-        'javascript': ['function', 'var', 'let', 'const', 'if', 'else', 'for', 'while', 'return', 'true', 'false', 'null', 'undefined'],
-        'typescript': ['function', 'var', 'let', 'const', 'if', 'else', 'for', 'while', 'return', 'true', 'false', 'null', 'undefined', 'interface', 'type', 'class'],
-        'python': ['def', 'if', 'else', 'elif', 'for', 'while', 'return', 'True', 'False', 'None', 'class', 'import', 'from'],
-        'java': ['public', 'private', 'protected', 'class', 'interface', 'if', 'else', 'for', 'while', 'return', 'true', 'false', 'null'],
-        'cpp': ['if', 'else', 'for', 'while', 'return', 'true', 'false', 'nullptr', 'class', 'struct', 'public', 'private'],
-        'c': ['if', 'else', 'for', 'while', 'return', 'true', 'false', 'NULL', 'struct'],
-        'html': ['html', 'head', 'body', 'div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'img', 'ul', 'ol', 'li'],
-        'css': ['color', 'background', 'margin', 'padding', 'border', 'width', 'height', 'display', 'position', 'float']
-    };
-    
-    return keywordMap[language] || [];
-}
-
-// 确保语法完整性，避免高亮错误
-function ensureCompleteSyntax(content) {
-    if (!content) return '';
-    
-    // 根据文件类型进行语法补全
-    switch (currentFileType) {
-        case 'javascript':
-        case 'typescript':
-        case 'jsx':
-        case 'tsx':
-            return ensureJavaScriptSyntax(content);
-        case 'python':
-            return ensurePythonSyntax(content);
-        case 'html':
-            return ensureHtmlSyntax(content);
-        case 'css':
-            return ensureCssSyntax(content);
-        case 'json':
-            return ensureJsonSyntax(content);
-        default:
-            return content;
-    }
-}
-
-// JavaScript/TypeScript语法补全
-function ensureJavaScriptSyntax(content) {
-    let result = content;
-    
-    // 如果以未闭合的字符串结尾，补全引号
-    const stringRegex = /(["'`])([^"'`]*)$/;
-    const match = result.match(stringRegex);
-    if (match && !match[0].endsWith(match[1])) {
-        result += match[1];
-    }
-    
-    // 如果以未闭合的括号结尾，补全括号
-    const openBraces = (result.match(/\{/g) || []).length;
-    const closeBraces = (result.match(/\}/g) || []).length;
-    if (openBraces > closeBraces) {
-        result += '}'.repeat(openBraces - closeBraces);
-    }
-    
-    const openParens = (result.match(/\(/g) || []).length;
-    const closeParens = (result.match(/\)/g) || []).length;
-    if (openParens > closeParens) {
-        result += ')'.repeat(openParens - closeParens);
-    }
-    
-    const openBrackets = (result.match(/\[/g) || []).length;
-    const closeBrackets = (result.match(/\]/g) || []).length;
-    if (openBrackets > closeBrackets) {
-        result += ']'.repeat(openBrackets - closeBrackets);
-    }
-    
-    return result;
-}
-
-// Python语法补全
-function ensurePythonSyntax(content) {
-    let result = content;
-    
-    // 如果以未闭合的字符串结尾，补全引号
-    const stringRegex = /(["'])([^"']*)$/;
-    const match = result.match(stringRegex);
-    if (match && !match[0].endsWith(match[1])) {
-        result += match[1];
-    }
-    
-    // 如果以未闭合的括号结尾，补全括号
-    const openParens = (result.match(/\(/g) || []).length;
-    const closeParens = (result.match(/\)/g) || []).length;
-    if (openParens > closeParens) {
-        result += ')'.repeat(openParens - closeParens);
-    }
-    
-    return result;
-}
-
-// HTML语法补全
-function ensureHtmlSyntax(content) {
-    let result = content;
-    
-    // 如果以未闭合的标签结尾，补全标签
-    const tagRegex = /<(\w+)([^>]*)$/;
-    const match = result.match(tagRegex);
-    if (match) {
-        result += '>';
-    }
-    
-    return result;
-}
-
-// CSS语法补全
-function ensureCssSyntax(content) {
-    let result = content;
-    
-    // 如果以未闭合的大括号结尾，补全大括号
-    const openBraces = (result.match(/\{/g) || []).length;
-    const closeBraces = (result.match(/\}/g) || []).length;
-    if (openBraces > closeBraces) {
-        result += '}'.repeat(openBraces - closeBraces);
-    }
-    
-    return result;
-}
-
-// JSON语法补全
-function ensureJsonSyntax(content) {
-    let result = content;
-    
-    // 如果以未闭合的字符串结尾，补全引号
-    const stringRegex = /"([^"]*)$/;
-    const match = result.match(stringRegex);
-    if (match) {
-        result += '"';
-    }
-    
-    // 如果以未闭合的大括号结尾，补全大括号
-    const openBraces = (result.match(/\{/g) || []).length;
-    const closeBraces = (result.match(/\}/g) || []).length;
-    if (openBraces > closeBraces) {
-        result += '}'.repeat(openBraces - closeBraces);
-    }
-    
-    return result;
 }
 
 // 更新行号
@@ -1209,19 +1032,19 @@ function enterWordEditMode() {
 // VSCode风格编辑模式
 function enterVSCodeEditMode() {
     // 使代码内容可编辑
-    codeContent.contentEditable = true;
-    codeContent.style.cursor = 'text';
-    codeContent.style.outline = '2px solid #007acc';
-    codeContent.style.outlineOffset = '2px';
-    
-    // 显示全部内容（纯文本）
-    codeContent.innerHTML = `<pre><code class="language-${currentFileType}">${escapeHtml(importedContent)}</code></pre>`;
-    
-    editableElement = codeContent;
-    codeContent.focus();
-    
-    // 绑定输入事件
-    codeContent.addEventListener('input', handleEditInput);
+    const codeElement = codeContent.querySelector('code');
+    if (codeElement) {
+        codeElement.contentEditable = true;
+        codeElement.style.cursor = 'text';
+        codeElement.style.outline = '2px solid #007acc';
+        codeElement.style.outlineOffset = '2px';
+        
+        editableElement = codeElement;
+        codeElement.focus();
+        
+        // 绑定输入事件
+        codeElement.addEventListener('input', handleEditInput);
+    }
 }
 
 // 处理编辑输入
@@ -1308,11 +1131,14 @@ function exitWordEditMode() {
 
 // 退出VSCode编辑模式
 function exitVSCodeEditMode() {
-    codeContent.contentEditable = false;
-    codeContent.style.cursor = 'default';
-    codeContent.style.outline = 'none';
-    
-    // 移除输入事件监听
-    codeContent.removeEventListener('input', handleEditInput);
+    const codeElement = codeContent.querySelector('code');
+    if (codeElement) {
+        codeElement.contentEditable = false;
+        codeElement.style.cursor = 'default';
+        codeElement.style.outline = 'none';
+        
+        // 移除输入事件监听
+        codeElement.removeEventListener('input', handleEditInput);
+    }
     editableElement = null;
 }
