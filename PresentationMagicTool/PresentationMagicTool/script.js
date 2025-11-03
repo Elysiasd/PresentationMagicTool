@@ -897,6 +897,12 @@ document.addEventListener('drop', function(e) {
                 updateStatus();
                 updateControlButtons();
                 showNotification(`文件导入成功！检测到语言: ${getLanguageName(currentFileType)}`, 'success');
+                
+                // 关闭文件导入对话框（如果打开的话）
+                const fileModal = document.getElementById('file-modal');
+                if (fileModal && fileModal.style.display === 'block') {
+                    fileModal.style.display = 'none';
+                }
             };
             reader.readAsText(file, 'UTF-8');
         } else {
@@ -1592,22 +1598,14 @@ function toggleFullscreen() {
     const appContainer = document.querySelector('.app-container');
     
     isFullscreen = !isFullscreen;
-    
     if (isFullscreen) {
-        // 进入全屏模式
+        // 进入全屏模式，只隐藏侧边栏、顶部标题栏、历史面板
         sidebar.style.display = 'none';
         contentHeader.style.display = 'none';
-        controlPanel.style.display = 'none';
         historyPanel.style.display = 'none';
-        wordToolbar.style.display = 'none';
-        vscodeToolbar.style.display = 'none';
-        
-        // 添加全屏样式类
+        // 工具栏、控制面板等按钮全部保留显示
         appContainer.classList.add('fullscreen-mode');
-        
-        // 显示退出全屏提示
         showFullscreenHint();
-        
         showNotification('已进入全屏模式，按 ESC 或点击屏幕右上角退出', 'info');
     } else {
         // 退出全屏模式
@@ -1628,18 +1626,14 @@ function exitFullscreen() {
     
     sidebar.style.display = 'flex';
     contentHeader.style.display = 'flex';
-    controlPanel.style.display = 'block';
-    wordToolbar.style.display = 'block';
-    vscodeToolbar.style.display = 'block';
-    
+    historyPanel.style.display = '';
+    // 工具栏、控制面板等按钮本来就未隐藏，无需恢复
     appContainer.classList.remove('fullscreen-mode');
-    
     // 移除退出全屏按钮
     const exitBtn = document.getElementById('exit-fullscreen-btn');
     if (exitBtn) {
         exitBtn.remove();
     }
-    
     showNotification('已退出全屏模式', 'info');
 }
 
