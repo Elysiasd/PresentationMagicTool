@@ -116,6 +116,12 @@ function bindMenuButtons() {
             btn.addEventListener('click', () => openReplaceFileDialog());
         } else if (index === 1) { // 编辑
             btn.addEventListener('click', () => toggleEditMode());
+        } else if (index === 2) { // 样式设置
+            // 已通过 id 绑定，不需要这里处理
+        } else if (index === 3) { // 帮助
+            btn.addEventListener('click', () => showHelp('word'));
+        } else if (index === 4) { // 全屏
+            btn.addEventListener('click', () => toggleFullscreen());
         }
     });
     
@@ -126,8 +132,31 @@ function bindMenuButtons() {
             item.addEventListener('click', () => openReplaceFileDialog());
         } else if (index === 1) { // 编辑
             item.addEventListener('click', () => toggleEditMode());
+        } else if (index === 2) { // 运行
+            item.addEventListener('click', () => handleRunClick());
+        } else if (index === 3) { // 帮助
+            item.addEventListener('click', () => showHelp('vscode'));
+        } else if (index === 4) { // 全屏
+            item.addEventListener('click', () => toggleFullscreen());
         }
     });
+    
+    // 绑定 Word 样式设置按钮
+    bindWordStyleSettings();
+}
+
+// 处理运行按钮点击
+function handleRunClick() {
+    if (!importedContent) {
+        showNotification('请先导入文件', 'warning');
+        return;
+    }
+    
+    if (currentFileType === 'python') {
+        executePythonCode();
+    } else {
+        showNotification('当前暂时只支持 Python 文件运行', 'info');
+    }
 }
 
 // 打开文件导入模态框
@@ -1149,40 +1178,6 @@ function exitVSCodeEditMode() {
 
 // ==================== Python 代码执行功能 ====================
 
-// 创建运行按钮
-function createRunButton() {
-    // 检查是否已存在运行按钮
-    if (document.getElementById('run-python-btn')) {
-        return;
-    }
-    
-    // 只在 VSCode 风格且文件类型为 Python 时显示
-    if (currentStyle !== 'vscode' || currentFileType !== 'python') {
-        removeRunButton();
-        return;
-    }
-    
-    const toolbar = document.querySelector('.vscode-toolbar .vscode-menu');
-    if (!toolbar) return;
-    
-    const runBtn = document.createElement('button');
-    runBtn.id = 'run-python-btn';
-    runBtn.className = 'run-python-button';
-    runBtn.innerHTML = '▶️ 运行 Python';
-    runBtn.title = '运行当前显示的 Python 代码';
-    runBtn.onclick = executePythonCode;
-    
-    toolbar.appendChild(runBtn);
-}
-
-// 移除运行按钮
-function removeRunButton() {
-    const runBtn = document.getElementById('run-python-btn');
-    if (runBtn) {
-        runBtn.remove();
-    }
-}
-
 // 创建输出面板
 function createOutputPanel() {
     // 检查是否已存在输出面板
@@ -1347,15 +1342,490 @@ function displayExecutionResult(result, container) {
     container.innerHTML = html;
 }
 
-// 监听风格切换和文件导入，更新运行按钮
-const originalSwitchStyle = switchStyle;
-switchStyle = function(style) {
-    originalSwitchStyle(style);
-    setTimeout(createRunButton, 100);
+// ==================== 帮助功能 ====================
+
+// 显示帮助文档
+function showHelp(style) {
+    const helpModal = document.getElementById('help-modal');
+    const helpTitle = document.getElementById('help-title');
+    const helpContent = document.getElementById('help-content');
+    
+    if (style === 'word') {
+        helpTitle.textContent = 'Word 风格使用帮助';
+        helpContent.innerHTML = getWordHelp();
+    } else {
+        helpTitle.textContent = 'VSCode 风格使用帮助';
+        helpContent.innerHTML = getVSCodeHelp();
+    }
+    
+    helpModal.style.display = 'block';
+}
+
+// 关闭帮助对话框
+document.addEventListener('DOMContentLoaded', function() {
+    const helpModal = document.getElementById('help-modal');
+    const closeHelpBtn = document.getElementById('close-help-modal');
+    
+    if (closeHelpBtn) {
+        closeHelpBtn.addEventListener('click', () => {
+            helpModal.style.display = 'none';
+        });
+    }
+    
+    // 点击模态框外部关闭
+    helpModal.addEventListener('click', function(e) {
+        if (e.target === helpModal) {
+            helpModal.style.display = 'none';
+        }
+    });
+});
+
+// Word 风格帮助内容
+function getWordHelp() {
+    return `
+        <div class="help-section">
+            <h4>📄 Word 风格介绍</h4>
+            <p>Word 风格模仿 Microsoft Word 的文档编辑界面，适合展示文本内容和文档演示。</p>
+        </div>
+        
+        <div class="help-section">
+            <h4>🎯 主要功能</h4>
+            <ul>
+                <li><strong>文件导入：</strong>点击左侧"📁 导入文本文件"或工具栏"文件"按钮</li>
+                <li><strong>打字机效果：</strong>按任意键逐字符显示文档内容</li>
+                <li><strong>自动播放：</strong>点击"▶️ 播放"按钮自动展示</li>
+                <li><strong>编辑模式：</strong>点击"编辑"按钮可直接修改文档</li>
+                <li><strong>速度调节：</strong>拖动速度滑块调整播放速度</li>
+                <li><strong>样式设置：</strong>点击"设置"按钮自定义字体、字号、边距等</li>
+                <li><strong>全屏模式：</strong>点击"全屏"按钮进入沉浸式展示模式</li>
+            </ul>
+        </div>
+        
+        <div class="help-section">
+            <h4>🎨 样式自定义（新功能）</h4>
+            <p>点击工具栏"设置"按钮可以打开样式设置面板，支持以下自定义选项：</p>
+            <ul>
+                <li><strong>字体选择：</strong>8 种常用中文字体（宋体、黑体、微软雅黑、楷体等）</li>
+                <li><strong>字号调整：</strong>12px - 26px 范围调节</li>
+                <li><strong>行高设置：</strong>1.2x - 2.5x 行距选择</li>
+                <li><strong>页边距：</strong>分别设置上、右、下、左四个方向的边距（0-100px）</li>
+                <li><strong>段落间距：</strong>拖动滑块调整段落之间的间距（0-40px）</li>
+                <li><strong>一键重置：</strong>恢复所有设置到默认值</li>
+            </ul>
+            <p><strong>提示：</strong>设置会实时应用，方便预览效果。关闭设置面板后继续编辑或展示。</p>
+        </div>
+        
+        <div class="help-section">
+            <h4>🖥️ 全屏模式</h4>
+            <ul>
+                <li>点击工具栏"全屏"按钮进入全屏显示</li>
+                <li>自动隐藏侧边栏、工具栏、控制面板等界面元素</li>
+                <li>按 <kbd>ESC</kbd> 键或点击右上角"退出全屏"按钮退出</li>
+                <li>适合演讲、演示等场景使用</li>
+            </ul>
+        </div>
+        
+        <div class="help-section">
+            <h4>⌨️ 快捷键</h4>
+            <ul>
+                <li><kbd>Ctrl + O</kbd> - 打开文件</li>
+                <li><kbd>Ctrl + 1</kbd> - 切换到 Word 风格</li>
+                <li><kbd>Ctrl + 2</kbd> - 切换到 VSCode 风格</li>
+                <li><kbd>Ctrl + R</kbd> - 重置显示</li>
+                <li><kbd>Ctrl + A</kbd> - 显示全部内容</li>
+                <li><kbd>任意键</kbd> - 逐字显示（非编辑模式）</li>
+                <li><kbd>Backspace</kbd> - 回退一个字符</li>
+                <li><kbd>ESC</kbd> - 退出全屏模式</li>
+            </ul>
+        </div>
+        
+        <div class="help-section">
+            <h4>💡 使用技巧</h4>
+            <ul>
+                <li>支持拖拽文件到浏览器窗口直接导入</li>
+                <li>点击进度条可快速跳转到指定位置</li>
+                <li>历史面板保存最近 10 个文件，方便切换</li>
+                <li>编辑后的内容会自动保存到历史记录</li>
+                <li>先调整好样式设置，再开始演示效果更佳</li>
+                <li>全屏模式配合打字机效果，适合现场演示</li>
+            </ul>
+        </div>
+        
+        <div class="help-section">
+            <h4>📋 支持的文件格式</h4>
+            <p>.txt, .md, .js, .html, .css, .py, .java, .cpp, .c, .json, .xml, .csv</p>
+        </div>
+        
+        <div class="help-section">
+            <h4>🎨 界面特点</h4>
+            <ul>
+                <li>纸质文档效果，适合阅读</li>
+                <li>段落式显示，清晰明了</li>
+                <li>可自定义字体、字号、行高、边距</li>
+                <li>支持全屏沉浸式展示</li>
+                <li>最大宽度 800px，符合最佳阅读宽度</li>
+            </ul>
+        </div>
+    `;
+}
+
+// VSCode 风格帮助内容
+function getVSCodeHelp() {
+    return `
+        <div class="help-section">
+            <h4>💻 VSCode 风格介绍</h4>
+            <p>VSCode 风格模仿 Visual Studio Code 代码编辑器界面，适合展示代码和编程演示。</p>
+        </div>
+        
+        <div class="help-section">
+            <h4>🎯 主要功能</h4>
+            <ul>
+                <li><strong>文件导入：</strong>点击左侧"📁 导入文本文件"或工具栏"文件"按钮</li>
+                <li><strong>语法高亮：</strong>自动识别 30+ 种编程语言并高亮显示</li>
+                <li><strong>打字机效果：</strong>按任意键逐字符显示代码</li>
+                <li><strong>自动播放：</strong>点击"▶️ 播放"按钮自动展示</li>
+                <li><strong>运行代码：</strong>点击"运行"按钮执行 Python 代码（需启动服务器）</li>
+                <li><strong>编辑模式：</strong>点击"编辑"按钮可直接修改代码</li>
+                <li><strong>行号显示：</strong>左侧显示代码行号</li>
+                <li><strong>全屏模式：</strong>点击"全屏"按钮进入沉浸式展示模式</li>
+            </ul>
+        </div>
+        
+        <div class="help-section">
+            <h4>🐍 Python 代码执行</h4>
+            <p><strong>使用步骤：</strong></p>
+            <ol>
+                <li>启动增强版服务器：<code>python server_enhanced.py</code></li>
+                <li>导入 .py 文件</li>
+                <li>切换到 VSCode 风格</li>
+                <li>点击工具栏"运行"按钮</li>
+                <li>查看底部输出面板的执行结果</li>
+            </ol>
+            <p><strong>注意：</strong>非 Python 文件点击运行会提示"当前暂时只支持 Python 文件运行"</p>
+        </div>
+        
+        <div class="help-section">
+            <h4>🖥️ 全屏模式</h4>
+            <ul>
+                <li>点击工具栏"全屏"按钮进入全屏显示</li>
+                <li>自动隐藏侧边栏、工具栏、控制面板等界面元素</li>
+                <li>按 <kbd>ESC</kbd> 键或点击右上角"退出全屏"按钮退出</li>
+                <li>适合代码演示、教学等场景使用</li>
+                <li>全屏模式下输出面板依然可见，方便查看运行结果</li>
+            </ul>
+        </div>
+        
+        <div class="help-section">
+            <h4>⌨️ 快捷键</h4>
+            <ul>
+                <li><kbd>Ctrl + O</kbd> - 打开文件</li>
+                <li><kbd>Ctrl + 1</kbd> - 切换到 Word 风格</li>
+                <li><kbd>Ctrl + 2</kbd> - 切换到 VSCode 风格</li>
+                <li><kbd>Ctrl + R</kbd> - 重置显示</li>
+                <li><kbd>Ctrl + A</kbd> - 显示全部内容</li>
+                <li><kbd>任意键</kbd> - 逐字显示（非编辑模式）</li>
+                <li><kbd>Backspace</kbd> - 回退一个字符</li>
+                <li><kbd>ESC</kbd> - 退出全屏模式</li>
+            </ul>
+        </div>
+        
+        <div class="help-section">
+            <h4>🎨 语法高亮支持</h4>
+            <p><strong>自动识别的语言：</strong></p>
+            <ul>
+                <li>JavaScript, TypeScript, JSX, TSX</li>
+                <li>Python, Java, C, C++, C#</li>
+                <li>HTML, CSS, SCSS, Sass, Less</li>
+                <li>JSON, XML, YAML</li>
+                <li>SQL, Bash, PowerShell</li>
+                <li>Markdown, 纯文本</li>
+                <li>还有更多...</li>
+            </ul>
+        </div>
+        
+        <div class="help-section">
+            <h4>💡 使用技巧</h4>
+            <ul>
+                <li>支持拖拽代码文件到浏览器窗口</li>
+                <li>可以先显示部分代码，再点击运行（演示效果更好）</li>
+                <li>编辑模式下可以修改代码后重新运行</li>
+                <li>输出面板可以关闭，点击右上角 × 按钮</li>
+                <li>代码高亮自动缓存，提升性能</li>
+                <li>全屏模式配合打字机效果，适合现场代码演示</li>
+            </ul>
+        </div>
+        
+        <div class="help-section">
+            <h4>🔧 服务器说明</h4>
+            <ul>
+                <li><strong>基础服务器：</strong><code>python server.py</code> - 仅提供文件浏览</li>
+                <li><strong>增强服务器：</strong><code>python server_enhanced.py</code> - 支持 Python 代码执行</li>
+                <li><strong>端口：</strong>默认 5000，访问 <code>http://localhost:5000</code></li>
+                <li><strong>停止服务器：</strong>按 <kbd>Ctrl + C</kbd></li>
+            </ul>
+        </div>
+        
+        <div class="help-section">
+            <h4>⚠️ 注意事项</h4>
+            <ul>
+                <li>Python 代码执行功能仅限本地使用，不要暴露到公网</li>
+                <li>代码执行有 30 秒超时限制，防止死循环</li>
+                <li>确保 Python 文件使用 UTF-8 编码保存</li>
+                <li>首次使用请查看 <code>Python执行功能使用指南.md</code></li>
+            </ul>
+        </div>
+    `;
+}
+
+// ==================== 全屏功能 ====================
+
+let isFullscreen = false;
+
+// 切换全屏模式
+function toggleFullscreen() {
+    const sidebar = document.querySelector('.sidebar');
+    const contentHeader = document.querySelector('.content-header');
+    const controlPanel = document.querySelector('.control-panel');
+    const historyPanel = document.querySelector('.history-panel');
+    const wordToolbar = document.querySelector('.word-toolbar');
+    const vscodeToolbar = document.querySelector('.vscode-toolbar');
+    const appContainer = document.querySelector('.app-container');
+    
+    isFullscreen = !isFullscreen;
+    
+    if (isFullscreen) {
+        // 进入全屏模式
+        sidebar.style.display = 'none';
+        contentHeader.style.display = 'none';
+        controlPanel.style.display = 'none';
+        historyPanel.style.display = 'none';
+        wordToolbar.style.display = 'none';
+        vscodeToolbar.style.display = 'none';
+        
+        // 添加全屏样式类
+        appContainer.classList.add('fullscreen-mode');
+        
+        // 显示退出全屏提示
+        showFullscreenHint();
+        
+        showNotification('已进入全屏模式，按 ESC 或点击屏幕右上角退出', 'info');
+    } else {
+        // 退出全屏模式
+        exitFullscreen();
+    }
+}
+
+// 退出全屏模式
+function exitFullscreen() {
+    const sidebar = document.querySelector('.sidebar');
+    const contentHeader = document.querySelector('.content-header');
+    const controlPanel = document.querySelector('.control-panel');
+    const wordToolbar = document.querySelector('.word-toolbar');
+    const vscodeToolbar = document.querySelector('.vscode-toolbar');
+    const appContainer = document.querySelector('.app-container');
+    
+    isFullscreen = false;
+    
+    sidebar.style.display = 'flex';
+    contentHeader.style.display = 'flex';
+    controlPanel.style.display = 'block';
+    wordToolbar.style.display = 'block';
+    vscodeToolbar.style.display = 'block';
+    
+    appContainer.classList.remove('fullscreen-mode');
+    
+    // 移除退出全屏按钮
+    const exitBtn = document.getElementById('exit-fullscreen-btn');
+    if (exitBtn) {
+        exitBtn.remove();
+    }
+    
+    showNotification('已退出全屏模式', 'info');
+}
+
+// 显示退出全屏提示
+function showFullscreenHint() {
+    // 移除旧的按钮（如果存在）
+    const oldBtn = document.getElementById('exit-fullscreen-btn');
+    if (oldBtn) {
+        oldBtn.remove();
+    }
+    
+    // 创建退出全屏按钮
+    const exitBtn = document.createElement('button');
+    exitBtn.id = 'exit-fullscreen-btn';
+    exitBtn.className = 'exit-fullscreen-btn';
+    exitBtn.innerHTML = '✕ 退出全屏';
+    exitBtn.title = '退出全屏模式 (ESC)';
+    exitBtn.onclick = exitFullscreen;
+    
+    document.body.appendChild(exitBtn);
+}
+
+// 监听 ESC 键退出全屏
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && isFullscreen) {
+        exitFullscreen();
+    }
+});
+
+// ==================== Word 样式设置功能 ====================
+
+// Word 样式配置对象
+const wordStyles = {
+    fontFamily: "'SimSun', serif",
+    fontSize: "14px",
+    lineHeight: "1.6",
+    marginTop: "40px",
+    marginRight: "40px",
+    marginBottom: "40px",
+    marginLeft: "40px",
+    paragraphSpacing: "16px"
 };
 
-const originalImportFile = importFile;
-importFile = function() {
-    originalImportFile();
-    setTimeout(createRunButton, 100);
+// 绑定 Word 样式设置事件
+function bindWordStyleSettings() {
+    const settingsBtn = document.getElementById('word-settings-btn');
+    const settingsPanel = document.getElementById('word-settings-panel');
+    const closeSettingsBtn = document.getElementById('close-word-settings');
+    const resetStylesBtn = document.getElementById('reset-word-styles');
+    
+    const fontFamilySelect = document.getElementById('font-family-select');
+    const fontSizeSelect = document.getElementById('font-size-select');
+    const lineHeightSelect = document.getElementById('line-height-select');
+    const marginTop = document.getElementById('margin-top');
+    const marginRight = document.getElementById('margin-right');
+    const marginBottom = document.getElementById('margin-bottom');
+    const marginLeft = document.getElementById('margin-left');
+    const paragraphSpacing = document.getElementById('paragraph-spacing');
+    const paragraphSpacingValue = document.getElementById('paragraph-spacing-value');
+    
+    // 打开设置面板
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', () => {
+            const isVisible = settingsPanel.style.display === 'block';
+            settingsPanel.style.display = isVisible ? 'none' : 'block';
+        });
+    }
+    
+    // 关闭设置面板
+    if (closeSettingsBtn) {
+        closeSettingsBtn.addEventListener('click', () => {
+            settingsPanel.style.display = 'none';
+        });
+    }
+    
+    // 字体切换
+    if (fontFamilySelect) {
+        fontFamilySelect.addEventListener('change', (e) => {
+            wordStyles.fontFamily = e.target.value;
+            applyWordStyles();
+        });
+    }
+    
+    // 字号调整
+    if (fontSizeSelect) {
+        fontSizeSelect.addEventListener('change', (e) => {
+            wordStyles.fontSize = e.target.value;
+            applyWordStyles();
+        });
+    }
+    
+    // 行距调整
+    if (lineHeightSelect) {
+        lineHeightSelect.addEventListener('change', (e) => {
+            wordStyles.lineHeight = e.target.value;
+            applyWordStyles();
+        });
+    }
+    
+    // 页边距调整
+    [marginTop, marginRight, marginBottom, marginLeft].forEach((input, index) => {
+        if (input) {
+            input.addEventListener('input', (e) => {
+                const margins = ['marginTop', 'marginRight', 'marginBottom', 'marginLeft'];
+                wordStyles[margins[index]] = e.target.value + 'px';
+                applyWordStyles();
+            });
+        }
+    });
+    
+    // 段落间距调整
+    if (paragraphSpacing) {
+        paragraphSpacing.addEventListener('input', (e) => {
+            const value = e.target.value;
+            wordStyles.paragraphSpacing = value + 'px';
+            paragraphSpacingValue.textContent = value + 'px';
+            applyWordStyles();
+        });
+    }
+    
+    // 恢复默认样式
+    if (resetStylesBtn) {
+        resetStylesBtn.addEventListener('click', () => {
+            resetWordStyles();
+        });
+    }
+    
+    // 初始化应用样式
+    applyWordStyles();
+}
+
+// 应用 Word 样式
+function applyWordStyles() {
+    const documentContent = document.getElementById('document-content');
+    if (!documentContent) return;
+    
+    documentContent.style.fontFamily = wordStyles.fontFamily;
+    documentContent.style.fontSize = wordStyles.fontSize;
+    documentContent.style.lineHeight = wordStyles.lineHeight;
+    
+    // 应用页边距到 word-content
+    const wordContent = document.querySelector('.word-content');
+    if (wordContent) {
+        wordContent.style.padding = `${wordStyles.marginTop} ${wordStyles.marginRight} 40vh ${wordStyles.marginLeft}`;
+    }
+    
+    // 应用段落间距
+    const paragraphs = documentContent.querySelectorAll('p');
+    paragraphs.forEach(p => {
+        p.style.marginBottom = wordStyles.paragraphSpacing;
+    });
+}
+
+// 重置 Word 样式为默认值
+function resetWordStyles() {
+    // 重置样式配置
+    wordStyles.fontFamily = "'SimSun', serif";
+    wordStyles.fontSize = "14px";
+    wordStyles.lineHeight = "1.6";
+    wordStyles.marginTop = "40px";
+    wordStyles.marginRight = "40px";
+    wordStyles.marginBottom = "40px";
+    wordStyles.marginLeft = "40px";
+    wordStyles.paragraphSpacing = "16px";
+    
+    // 重置表单值
+    document.getElementById('font-family-select').value = "'SimSun', serif";
+    document.getElementById('font-size-select').value = "14px";
+    document.getElementById('line-height-select').value = "1.6";
+    document.getElementById('margin-top').value = "40";
+    document.getElementById('margin-right').value = "40";
+    document.getElementById('margin-bottom').value = "40";
+    document.getElementById('margin-left').value = "40";
+    document.getElementById('paragraph-spacing').value = "16";
+    document.getElementById('paragraph-spacing-value').textContent = "16px";
+    
+    // 应用样式
+    applyWordStyles();
+    
+    showNotification('已恢复默认样式', 'success');
+}
+
+// 修改 updateWordDisplay 函数以应用自定义样式
+const originalUpdateWordDisplay = updateWordDisplay;
+updateWordDisplay = function(content) {
+    originalUpdateWordDisplay(content);
+    // 应用自定义样式
+    setTimeout(() => applyWordStyles(), 10);
 };

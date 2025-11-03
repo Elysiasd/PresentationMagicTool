@@ -91,10 +91,79 @@
                     <div class="toolbar-group">
                         <button class="toolbar-btn">文件</button>
                         <button class="toolbar-btn">编辑</button>
-                        <button class="toolbar-btn">视图</button>
-                        <button class="toolbar-btn">插入</button>
+                        <button class="toolbar-btn" id="word-settings-btn">⚙️ 样式</button>
+                        <button class="toolbar-btn">帮助</button>
+                        <button class="toolbar-btn fullscreen-btn" title="全屏显示">🖥️</button>
                     </div>
                 </div>
+                
+                <!-- Word 样式设置面板 -->
+                <div class="word-settings-panel" id="word-settings-panel">
+                    <div class="settings-group">
+                        <label>字体：</label>
+                        <select id="font-family-select">
+                            <option value="'SimSun', serif">宋体</option>
+                            <option value="'SimHei', sans-serif">黑体</option>
+                            <option value="'Microsoft YaHei', sans-serif">微软雅黑</option>
+                            <option value="'KaiTi', serif">楷体</option>
+                            <option value="'FangSong', serif">仿宋</option>
+                            <option value="'Arial', sans-serif">Arial</option>
+                            <option value="'Times New Roman', serif">Times New Roman</option>
+                            <option value="'Courier New', monospace">Courier New</option>
+                        </select>
+                    </div>
+                    
+                    <div class="settings-group">
+                        <label>字号：</label>
+                        <select id="font-size-select">
+                            <option value="12px">小五 (12px)</option>
+                            <option value="14px" selected>五号 (14px)</option>
+                            <option value="16px">小四 (16px)</option>
+                            <option value="18px">四号 (18px)</option>
+                            <option value="20px">小三 (20px)</option>
+                            <option value="22px">三号 (22px)</option>
+                            <option value="24px">小二 (24px)</option>
+                            <option value="26px">二号 (26px)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="settings-group">
+                        <label>行距：</label>
+                        <select id="line-height-select">
+                            <option value="1.2">单倍行距 (1.2)</option>
+                            <option value="1.5">1.5 倍行距</option>
+                            <option value="1.6" selected>1.6 倍行距</option>
+                            <option value="2.0">2 倍行距</option>
+                            <option value="2.5">2.5 倍行距</option>
+                        </select>
+                    </div>
+                    
+                    <div class="settings-group">
+                        <label>页边距：</label>
+                        <div class="margin-inputs">
+                            <input type="number" id="margin-top" min="0" max="100" value="40" />
+                            <span>上</span>
+                            <input type="number" id="margin-right" min="0" max="200" value="40" />
+                            <span>右</span>
+                            <input type="number" id="margin-bottom" min="0" max="100" value="40" />
+                            <span>下</span>
+                            <input type="number" id="margin-left" min="0" max="200" value="40" />
+                            <span>左 (px)</span>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-group">
+                        <label>段落间距：</label>
+                        <input type="range" id="paragraph-spacing" min="0" max="40" value="16" />
+                        <span id="paragraph-spacing-value">16px</span>
+                    </div>
+                    
+                    <div class="settings-group">
+                        <button class="settings-btn" id="reset-word-styles">恢复默认</button>
+                        <button class="settings-btn" id="close-word-settings">关闭</button>
+                    </div>
+                </div>
+                
                 <div class="word-content">
                     <div class="document-content" id="document-content">
                         <p>请导入文本文件开始演示...</p>
@@ -108,12 +177,9 @@
                     <div class="vscode-menu">
                         <span class="menu-item">文件</span>
                         <span class="menu-item">编辑</span>
-                        <span class="menu-item">选择</span>
-                        <span class="menu-item">查看</span>
-                        <span class="menu-item">转到</span>
                         <span class="menu-item">运行</span>
-                        <span class="menu-item">终端</span>
                         <span class="menu-item">帮助</span>
+                        <span class="menu-item fullscreen-btn" title="全屏显示">🖥️</span>
                     </div>
                 </div>
                 <div class="vscode-content">
@@ -153,6 +219,19 @@
             <div class="modal-footer">
                 <button class="btn btn-primary" id="import-btn" disabled>导入</button>
                 <button class="btn btn-secondary" id="cancel-btn">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 帮助对话框 -->
+    <div class="modal" id="help-modal">
+        <div class="modal-content help-modal-content">
+            <div class="modal-header">
+                <h3 id="help-title">使用帮助</h3>
+                <span class="close" id="close-help-modal">&times;</span>
+            </div>
+            <div class="modal-body help-modal-body" id="help-content">
+                <!-- 帮助内容动态加载 -->
             </div>
         </div>
     </div>
