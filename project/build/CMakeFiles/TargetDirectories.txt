@@ -1,7 +1,0 @@
-C:/Users/70454/Desktop/software/PresentationMagicTool/project/build/CMakeFiles/PresentationMagicTool.dir
-C:/Users/70454/Desktop/software/PresentationMagicTool/project/build/CMakeFiles/edit_cache.dir
-C:/Users/70454/Desktop/software/PresentationMagicTool/project/build/CMakeFiles/rebuild_cache.dir
-C:/Users/70454/Desktop/software/PresentationMagicTool/project/build/CMakeFiles/list_install_components.dir
-C:/Users/70454/Desktop/software/PresentationMagicTool/project/build/CMakeFiles/install.dir
-C:/Users/70454/Desktop/software/PresentationMagicTool/project/build/CMakeFiles/install/local.dir
-C:/Users/70454/Desktop/software/PresentationMagicTool/project/build/CMakeFiles/install/strip.dir

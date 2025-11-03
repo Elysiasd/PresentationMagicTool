@@ -1,3 +1,0 @@
-"C:\Program Files\CMake\bin\cmake.exe" -E rm -f CMakeFiles\PresentationMagicTool.dir/objects.a
-C:\PROGRA~2\mingw64\bin\ar.exe qc CMakeFiles\PresentationMagicTool.dir/objects.a @CMakeFiles\PresentationMagicTool.dir\objects1.rsp
-C:\PROGRA~2\mingw64\bin\C__~1.EXE -O3 -DNDEBUG -mwindows -Wl,--whole-archive CMakeFiles\PresentationMagicTool.dir/objects.a -Wl,--no-whole-archive -o C:\Users\70454\Desktop\software\PresentationMagicTool\project\bin\PresentationMagicTool.exe -Wl,--out-implib,libPresentationMagicTool.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles\PresentationMagicTool.dir\linkLibs.rsp

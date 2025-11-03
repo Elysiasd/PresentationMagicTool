@@ -16,6 +16,10 @@ let fileHistory = []; // 文件历史记录
 let isEditMode = false; // 是否处于编辑模式
 let editableElement = null; // 当前可编辑的元素
 
+// Python 执行相关变量
+let isExecuting = false; // 是否正在执行代码
+let executionOutput = null; // 执行输出容器
+
 // DOM 元素
 const wordInterface = document.getElementById('word-interface');
 const vscodeInterface = document.getElementById('vscode-interface');
@@ -1142,3 +1146,216 @@ function exitVSCodeEditMode() {
     }
     editableElement = null;
 }
+
+// ==================== Python 代码执行功能 ====================
+
+// 创建运行按钮
+function createRunButton() {
+    // 检查是否已存在运行按钮
+    if (document.getElementById('run-python-btn')) {
+        return;
+    }
+    
+    // 只在 VSCode 风格且文件类型为 Python 时显示
+    if (currentStyle !== 'vscode' || currentFileType !== 'python') {
+        removeRunButton();
+        return;
+    }
+    
+    const toolbar = document.querySelector('.vscode-toolbar .vscode-menu');
+    if (!toolbar) return;
+    
+    const runBtn = document.createElement('button');
+    runBtn.id = 'run-python-btn';
+    runBtn.className = 'run-python-button';
+    runBtn.innerHTML = '▶️ 运行 Python';
+    runBtn.title = '运行当前显示的 Python 代码';
+    runBtn.onclick = executePythonCode;
+    
+    toolbar.appendChild(runBtn);
+}
+
+// 移除运行按钮
+function removeRunButton() {
+    const runBtn = document.getElementById('run-python-btn');
+    if (runBtn) {
+        runBtn.remove();
+    }
+}
+
+// 创建输出面板
+function createOutputPanel() {
+    // 检查是否已存在输出面板
+    if (document.getElementById('python-output-panel')) {
+        return document.getElementById('python-output-panel');
+    }
+    
+    const panel = document.createElement('div');
+    panel.id = 'python-output-panel';
+    panel.className = 'python-output-panel';
+    panel.innerHTML = `
+        <div class="output-header">
+            <span class="output-title">📊 运行结果</span>
+            <button class="output-close" onclick="closeOutputPanel()">×</button>
+        </div>
+        <div class="output-content" id="python-output-content">
+            <div class="output-loading">正在执行代码...</div>
+        </div>
+    `;
+    
+    const vscodeContent = document.querySelector('.vscode-content');
+    if (vscodeContent) {
+        vscodeContent.appendChild(panel);
+    }
+    
+    return panel;
+}
+
+// 关闭输出面板
+function closeOutputPanel() {
+    const panel = document.getElementById('python-output-panel');
+    if (panel) {
+        panel.classList.remove('show');
+        setTimeout(() => {
+            panel.remove();
+        }, 300);
+    }
+}
+
+// 执行 Python 代码
+async function executePythonCode() {
+    if (isExecuting) {
+        showNotification('代码正在执行中，请稍候...', 'info');
+        return;
+    }
+    
+    if (!importedContent || currentFileType !== 'python') {
+        showNotification('请先导入 Python 文件', 'warning');
+        return;
+    }
+    
+    // 停止自动播放
+    stopAutoPlay();
+    
+    // 获取当前显示的代码
+    const codeToExecute = importedContent.substring(0, currentDisplayIndex);
+    
+    if (!codeToExecute.trim()) {
+        showNotification('没有可执行的代码', 'warning');
+        return;
+    }
+    
+    isExecuting = true;
+    
+    // 创建输出面板
+    const panel = createOutputPanel();
+    const outputContent = document.getElementById('python-output-content');
+    
+    // 显示面板和加载状态
+    setTimeout(() => panel.classList.add('show'), 10);
+    outputContent.innerHTML = '<div class="output-loading">⏳ 正在执行代码...</div>';
+    
+    try {
+        const response = await fetch('http://localhost:5000/api/execute', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                code: codeToExecute,
+                timeout: 30  // 30 秒超时
+            })
+        });
+        
+        const result = await response.json();
+        
+        // 显示执行结果
+        displayExecutionResult(result, outputContent);
+        
+    } catch (error) {
+        outputContent.innerHTML = `
+            <div class="output-error">
+                <div class="output-section-title">❌ 错误</div>
+                <pre>${escapeHtml(error.message)}</pre>
+                <div class="output-hint">提示：请确保服务器正在运行（使用 server_enhanced.py）</div>
+            </div>
+        `;
+        showNotification('执行失败：' + error.message, 'error');
+    } finally {
+        isExecuting = false;
+    }
+}
+
+// 显示执行结果
+function displayExecutionResult(result, container) {
+    let html = '';
+    
+    if (result.success) {
+        html += '<div class="output-success">';
+        html += '<div class="output-section-title">✅ 执行成功</div>';
+        
+        if (result.stdout) {
+            html += '<div class="output-section">';
+            html += '<div class="output-label">输出：</div>';
+            html += `<pre>${escapeHtml(result.stdout)}</pre>`;
+            html += '</div>';
+        } else {
+            html += '<div class="output-empty">（无输出）</div>';
+        }
+        
+        if (result.stderr) {
+            html += '<div class="output-section">';
+            html += '<div class="output-label">警告：</div>';
+            html += `<pre class="output-warning">${escapeHtml(result.stderr)}</pre>`;
+            html += '</div>';
+        }
+        
+        html += '</div>';
+        showNotification('代码执行成功！', 'success');
+        
+    } else {
+        html += '<div class="output-error">';
+        html += '<div class="output-section-title">❌ 执行失败</div>';
+        
+        if (result.stderr) {
+            html += '<div class="output-section">';
+            html += '<div class="output-label">错误信息：</div>';
+            html += `<pre>${escapeHtml(result.stderr)}</pre>`;
+            html += '</div>';
+        }
+        
+        if (result.stdout) {
+            html += '<div class="output-section">';
+            html += '<div class="output-label">部分输出：</div>';
+            html += `<pre>${escapeHtml(result.stdout)}</pre>`;
+            html += '</div>';
+        }
+        
+        if (result.error) {
+            html += '<div class="output-section">';
+            html += '<div class="output-label">详细错误：</div>';
+            html += `<pre>${escapeHtml(result.error)}</pre>`;
+            html += '</div>';
+        }
+        
+        html += '</div>';
+        showNotification('代码执行失败', 'error');
+    }
+    
+    html += `<div class="output-footer">返回码: ${result.returncode}</div>`;
+    
+    container.innerHTML = html;
+}
+
+// 监听风格切换和文件导入，更新运行按钮
+const originalSwitchStyle = switchStyle;
+switchStyle = function(style) {
+    originalSwitchStyle(style);
+    setTimeout(createRunButton, 100);
+};
+
+const originalImportFile = importFile;
+importFile = function() {
+    originalImportFile();
+    setTimeout(createRunButton, 100);
+};
